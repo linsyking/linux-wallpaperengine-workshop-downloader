@@ -38,7 +38,19 @@ mytxt=response.content.decode(encoding='utf-8',errors='ignore')
 regr=r'workshopItemPreviewImage.*?src="(.*?)"[\s\S]*?SharedFileBindMouseHover.*?(\{.*?\})'
 regx=re.compile(regr)
 regs=re.findall(regx,mytxt)
-#print(regs)
+
+if(checkfull()==0):
+    #Finished
+    mylist=[]
+    for item in regs:
+        myreq=json.loads(item[1])
+        if(len(myreq['title'])>20):
+            myreq['title']=myreq['title'][0:19]+'...'
+        mylist.append({'name':myreq['title'],'imgpath':'img/'+myreq['id']+'.jpg','id':myreq['id']})
+    print(json.dumps(mylist))
+    exit(0)
+
+
 mylist=[]
 for item in regs:
     myreq=json.loads(item[1])

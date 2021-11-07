@@ -11,8 +11,8 @@ Window {
     property int mht: 600
     property int mwt: 1075
     property string mpath: "file:///" + applicationDirPath
-    property var mjk: []
-
+    property int downloadnum:0
+    property var downloaditems: []
     id: mainwindow
 //    maximumHeight: mht
 //    maximumWidth: mwt
@@ -23,13 +23,26 @@ Window {
     visible: true
     title: "Wallpaper Engine Workshop Downloader"
 
-    MessageDialog {
-        id: messageDialog
 
-        title: "Downloader"
-        text: "Starting to download this wallpaper"
+    Timer{
+        id: checkme
+        interval: 10
+        running: false
+        repeat: false
+        onTriggered: {
+            let msg=qprocess.launch("python3 main.py "+searchbox.text);
+            messagetext.text=msg;
+            if(msg==='-1\n'){
+                messagetext.text='Cannot connect to steam Wallpaper Engine workshop, please check your internet connection';
+                Myjs.deletePreview();
+            }else{
+                messagetext.text='';
+                Myjs.loadPreview(msg);
+            }
+            running=false;
+            busyIndicator.running=false;
+        }
     }
-
 
     Rectangle{
         id: modemenu
@@ -68,12 +81,22 @@ Window {
                     anchors.centerIn: parent
                     text: 'Downloading'
                 }
+                Text{
+                    id:ddnum
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    anchors.rightMargin: 5
+                    color: 'grey'
+                    text: downloadnum
+                }
+
                 MouseArea{
                     anchors.fill: parent
                     onClicked: {
                         c1.color='#F0F0F0'
                         c3.color='#F0F0F0'
                         parent.color='#E0E0E0'
+                        Myjs.loaddownload();
                         mylayout.currentIndex=1;
                     }
                 }
@@ -130,15 +153,9 @@ Window {
                     width: 100
                     text: "Search"
                     onClicked: {
-                        let msg=qprocess.launch("python3 main.py "+searchbox.text);
-                        messagetext.text=msg;
-                        if(msg==='-1\n'){
-                            console.log("OK");
-                            messagetext.text='Cannot connect to steam Wallpaper Engine workshop, please check your internet connection';
-                            Myjs.deletePreview();
-                        }else{
-                            messagetext.text='';
-                            Myjs.loadPreview(msg);
+                        if(searchbox.text!=""){
+                            busyIndicator.running=true;
+                            checkme.running=true;
                         }
                     }
                 }
@@ -171,7 +188,6 @@ Window {
                 id: qprocess
             }
 
-
             Rectangle{
                 Layout.preferredHeight: mainwindow.height-mainmenu.height-10
                 Layout.preferredWidth: parent.width
@@ -191,11 +207,12 @@ Window {
                         Layout.margins: 10
 
                         function createobj(myjson){
-                            var obj=previewunit.createObject(previewLayout);
+                            let obj=previewunit.createObject(previewLayout);
                             obj.init(myjson);
                         }
 
                     }
+
                     ScrollBar.vertical: ScrollBar {}
                 }
                 Text {
@@ -243,18 +260,34 @@ Window {
                     }
 
                     MouseArea{
+                        //property bool isclicked:false
                         anchors.fill: myrect
                         hoverEnabled: true
                         onEntered: {
-                            myrect.color='#F0F0F0'
+                            if(!focus) myrect.color='#F0F0F0'
                         }
                         onExited: {
-                            myrect.color='#E0E0E0'
+                            if(!focus) myrect.color='#E0E0E0';
                         }
                         onDoubleClicked: {
                             //Start to download
-                            qprocess.launch('python3 down.py '+wpid);
-                            messageDialog.open();
+                            //If the file has been downloaded TO-DO
+                            downloadnum++;
+                            downloaditems.push(wpid);
+                            qprocess.launch("./control.sh main.py -D "+wpid);
+                        }
+                        onClicked: {
+                            myrect.color='#2ECCFA'
+                            mylabel.font.bold=true
+                            focus=true;
+                        }
+                        onFocusChanged: {
+                            if(!focus){
+                                myrect.color='#E0E0E0'
+                                mylabel.font.bold=false
+
+                            }
+
                         }
                     }
                 }
@@ -263,19 +296,114 @@ Window {
 
         }
 
-        Rectangle{
+        Rectangle{  //Downloading
             anchors.fill: parent
-            color: 'blue'
+            Flickable{
+                id: downloadview
+                anchors.fill: parent
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.DragOverBounds
+                ScrollBar.vertical: ScrollBar {}
+                clip: true
+                contentHeight: parent.height
+                contentWidth: parent.width
+                Grid{
+                    id: myddlist
+                    anchors.fill: parent
+                    spacing: 2
+                    columns: 1
+
+                    function createobj(data){
+                        let obj=downloadunit.createObject(myddlist);
+                        obj.init(data);
+                    }
+                }
+                Component{
+                    id:downloadunit
+                    Rectangle{
+                        height: 70
+                        width: parent.width
+                        property string prog: 'Unknow'
+                        property string cid;
+                        property string nameid;
+                        function init(data){
+                            cid=data;
+                            nameid=Myjs.findname(data);
+                        }
+                        Text{
+                            id:myname
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            text: nameid
+                        }
+                        Text{
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            text: 'Progress: '+prog
+                        }
+                        Rectangle{
+                            anchors.top: parent.bottom
+                            height: 2
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            color: 'grey'
+                        }
+                        Timer{
+                            interval: 200
+                            repeat: true
+                            running: true
+                            property bool isRun: false
+                            onTriggered: {
+                                //Detect file size
+                                if(qprocess.launch('cat '+cid+'.sta')==='NOTREADY\n'){
+                                    parent.prog='Waiting for the server'
+                                    return;
+                                }
+                                let status=qprocess.launch('ls '+cid+'.sta');
+                                if(status===''){
+                                    if(isRun){
+                                        parent.prog='Finished';
+                                        running=false;
+                                        return;
+                                    }
+                                }
+
+                                let sd=qprocess.launch('./control.sh size '+cid+'.zip');
+                                if(sd==='') return;
+
+                                sd=sd.slice(0,sd.length-1);     //Cut \n
+                                parent.prog=sd;
+                                isRun=true;
+                            }
+                        }
+                    }
+                }
+
+            }
+
         }
+
         Text{
-            text: 'About'
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.leftMargin: 20
+            anchors.topMargin: 50
+            textFormat: TextEdit.MarkdownText
+            text: Myjs.pysu
         }
     }
 
+    BusyIndicator {
+        id: busyIndicator
+        anchors.centerIn: mylayout
+        running: false
+    }
 
     Component.onDestruction: {
         console.log("Exiting...");
-        qprocess.launch('python3 del.py');
+        qprocess.launch('python3 main.py -d');
     }
 }
 
