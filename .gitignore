@@ -1,0 +1,6 @@
+*.pro
+*.user
+*.stash
+Makefile
+README.md
+*.qrc
