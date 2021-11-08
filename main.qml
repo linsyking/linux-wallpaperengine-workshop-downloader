@@ -9,15 +9,17 @@ import './myjs.js' as Myjs
 
 Window {
     property int mht: 600
-    property int mwt: 1075
+    property int mwt: 1050
     property string mpath: "file:///" + applicationDirPath
     property int downloadnum:0
     property var downloaditems: []
+    property int curPage: 1
+    property int totalPages: 1000
     id: mainwindow
 //    maximumHeight: mht
 //    maximumWidth: mwt
-//    minimumHeight: mht
-//    minimumWidth: mwt
+    minimumHeight: 400
+    minimumWidth: 600
     width: mwt
     height: mht
     visible: true
@@ -25,22 +27,23 @@ Window {
 
 
     Timer{
-        id: checkme
+        id: getNewPageRunner
         interval: 10
         running: false
         repeat: false
         onTriggered: {
-            let msg=qprocess.launch("python3 main.py "+searchbox.text);
+            let msg=qprocess.launch("python3 main.py -p "+curPage+" "+searchbox.text);
             messagetext.text=msg;
             if(msg==='-1\n'){
-                messagetext.text='Cannot connect to steam Wallpaper Engine workshop, please check your internet connection';
+                messagetext.text='Connection failed';
                 Myjs.deletePreview();
             }else{
                 messagetext.text='';
                 Myjs.loadPreview(msg);
             }
-            running=false;
-            busyIndicator.running=false;
+            selectPage.visible=true;
+            running=false;                  //Run once
+            busyIndicator.running=false;    //Not busy
         }
     }
 
@@ -122,6 +125,7 @@ Window {
             }
         }
     }
+
     Rectangle{
         id:seprator
         anchors.left: modemenu.right
@@ -153,9 +157,10 @@ Window {
                     width: 100
                     text: "Search"
                     onClicked: {
+                        curPage=1;
                         if(searchbox.text!=""){
                             busyIndicator.running=true;
-                            checkme.running=true;
+                            getNewPageRunner.running=true;
                         }
                     }
                 }
@@ -189,9 +194,10 @@ Window {
             }
 
             Rectangle{
-                Layout.preferredHeight: mainwindow.height-mainmenu.height-10
+                Layout.preferredHeight: mainwindow.height-mainmenu.height-10-40
                 Layout.preferredWidth: parent.width
                 Layout.margins: 5
+                Layout.bottomMargin: -5
                 Flickable{
                     anchors.fill: parent
                     flickableDirection: Flickable.VerticalFlick
@@ -210,7 +216,6 @@ Window {
                             let obj=previewunit.createObject(previewLayout);
                             obj.init(myjson);
                         }
-
                     }
 
                     ScrollBar.vertical: ScrollBar {}
@@ -223,6 +228,102 @@ Window {
                     font.italic: true
                     font.pointSize: 14
                     text: ""
+                }
+            }
+            Rectangle{
+                id:selectPage
+                Layout.preferredWidth: parent.width
+                Layout.preferredHeight: 40
+                visible: false
+                Rectangle{
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 2
+                    color: 'grey'
+                }
+
+                Button{
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.rightMargin: 20
+                    width: 70
+                    height: 20
+                    text: 'Refresh'
+                    onClicked: {    //Refresh current page
+                        busyIndicator.running=true;
+                        getNewPageRunner.running=true;
+                    }
+                }
+
+                RowLayout{
+                    id:mpages
+                    anchors.centerIn: parent
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 5
+                    Rectangle{
+                        id:goPreviousPage
+                        color: '#E0E0E0'
+                        Layout.preferredHeight: 20
+                        Layout.preferredWidth: 40
+                        visible: curPage>1
+                        Text {
+                            anchors.centerIn: parent
+                            text: 'Prev'
+                        }
+                        MouseArea{
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                busyIndicator.running=true;
+                                curPage--;
+                                getNewPageRunner.running=true;
+                            }
+                            onEntered: parent.color='#F0F0F0'
+                            onExited: parent.color='#E0E0E0'
+                            onPressed: parent.color='#D0D0D0'
+                            onReleased: parent.color='#E0E0E0'
+                        }
+                    }
+                    TextEdit{
+                        id: pageset
+                        Layout.preferredHeight: 20
+                        Layout.preferredWidth: 20
+                        selectByMouse: true
+                        text: curPage.toString()
+                        Keys.onReturnPressed: {
+                            searchbox.focus=false;
+                            if(curPage.toString()!=text){
+                                curPage=Number(text);
+                                busyIndicator.running=true;
+                                getNewPageRunner.running=true;
+                            }
+                        }
+                    }
+                    Rectangle{
+                        id:goNextPage
+                        color: '#E0E0E0'
+                        Layout.preferredHeight: 20
+                        Layout.preferredWidth: 40
+                        visible: curPage<totalPages
+                        Text {
+                            anchors.centerIn: parent
+                            text: 'Next'
+                        }
+                        MouseArea{
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                busyIndicator.running=true;
+                                curPage++;
+                                getNewPageRunner.running=true;
+                            }
+                            onEntered: parent.color='#F0F0F0'
+                            onExited: parent.color='#E0E0E0'
+                            onPressed: parent.color='#D0D0D0'
+                            onReleased: parent.color='#E0E0E0'
+                        }
+                    }
                 }
             }
 
@@ -287,13 +388,10 @@ Window {
                                 mylabel.font.bold=false
 
                             }
-
                         }
                     }
                 }
-
             }
-
         }
 
         Rectangle{  //Downloading
@@ -323,7 +421,7 @@ Window {
                     Rectangle{
                         height: 70
                         width: parent.width
-                        property string prog: 'Unknow'
+                        property string prog: 'Unknown'
                         property string cid;
                         property string nameid;
                         function init(data){
@@ -380,9 +478,7 @@ Window {
                         }
                     }
                 }
-
             }
-
         }
 
         Text{
@@ -399,6 +495,14 @@ Window {
         id: busyIndicator
         anchors.centerIn: mylayout
         running: false
+    }
+
+    onWidthChanged: {
+        //Automatically change columns
+        let singlelength=230
+        let space=120
+        let conum=(width-space)/singlelength
+        previewLayout.columns= Math.floor(conum);
     }
 
     Component.onDestruction: {

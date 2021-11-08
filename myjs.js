@@ -1,9 +1,10 @@
-var currentjson;
+var currentjson=[];
 var mylist=[];
 var pysu='# About \n\
 **Wallpaper Engine Workshop Downloader**    \n\
 **By linsyking** 2021\n\
 ';
+
 
 function trans(fromString) {
     //console.log(fromString);
@@ -17,7 +18,7 @@ function loadPreview(data){
     }
     //Create new objects
     var myjson=trans(data);
-    currentjson=myjson;
+    currentjson=currentjson.concat(myjson);
     for(var i in myjson){
         myjson[i].imgpath=mpath+'/'+myjson[i].imgpath;
         previewLayout.createobj(myjson[i]);
